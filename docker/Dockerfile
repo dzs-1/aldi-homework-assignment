@@ -5,6 +5,6 @@ WORKDIR /app
 COPY . .
 
 RUN mvn dependency:resolve
-RUN mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install chromium"
+RUN mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install chromium,firefox"
 
 CMD ["mvn", "test"]
