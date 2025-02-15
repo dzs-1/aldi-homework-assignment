@@ -1,0 +1,19 @@
+version: '3'
+services:
+  test-chrome:
+    build: .
+    environment:
+      - BROWSER=chromium
+      - HEADLESS=true
+    volumes:
+      - ./test-results:/tests/test-results
+      - ./reports:/tests/reports
+
+  test-firefox:
+    build: .
+    environment:
+      - BROWSER=firefox
+      - HEADLESS=true
+    volumes:
+      - ./test-results:/tests/test-results
+      - ./reports:/tests/reports
