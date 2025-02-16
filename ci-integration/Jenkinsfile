@@ -1,0 +1,131 @@
+pipeline {
+    agent any
+
+    environment {
+        TEST_RESULTS_BUCKET = 'aldi-test-results-bucket'
+        DOCKER_IMAGE = 'mcr.microsoft.com/playwright/java:v1.50.0-noble'
+        TEST_CONTAINER_NAME = 'test-container-${env.BUILD_NUMBER}'
+    }
+
+    parameters {
+        choice(
+            name: 'BROWSER',
+            choices: ['chrome', 'firefox'],
+            description: 'Select browser for test execution'
+        )
+        booleanParam(
+            name: 'RUN_SMOKE_TESTS',
+            defaultValue: true,
+            description: 'Run smoke tests after deployment'
+        )
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh '''
+                    mvn clean install -DskipTests
+                    mvn dependency:analyze
+                '''
+            }
+        }
+
+        stage('Test Execution') {
+            steps {
+                script {
+                    try {
+                        docker.image(DOCKER_IMAGE).inside("--name ${TEST_CONTAINER_NAME} -e BROWSER=${params.BROWSER} -e RUN_SMOKE_TESTS=${params.RUN_SMOKE_TESTS}") {
+                            sh """
+                                mvn test \
+                                -Dbrowser=${params.BROWSER} \
+                                -DrunSmoke=${params.RUN_SMOKE_TESTS} \
+                                -Dheadless=true
+                            """
+                        }
+                    } catch (Exception e) {
+                        currentBuild.result = 'UNSTABLE'
+                        error("Test execution failed: ${e.message}")
+                    }
+                }
+            }
+            post {
+                always {
+                    junit '**/target/surefire-reports/*.xml'
+
+                    archiveArtifacts(
+                        artifacts: '''
+                            target/surefire-reports/**,
+                            test-output/**/*.html,
+                            test-output/screenshots/**
+                        ''',
+                        fingerprint: true
+                    )
+
+                    script {
+                        def timestamp = new Date().format('yyyy-MM-dd_HH-mm-ss')
+                        def s3Path = "${env.JOB_NAME}/${env.BUILD_NUMBER}_${timestamp}"
+
+                        withAWS(credentials: 'aldi-aws-credentials') {
+                            s3Upload(
+                                bucket: "${TEST_RESULTS_BUCKET}",
+                                path: "${s3Path}/reports/",
+                                includePathPattern: '**/target/surefire-reports/**'
+                            )
+
+                            s3Upload(
+                                bucket: "${TEST_RESULTS_BUCKET}",
+                                path: "${s3Path}/screenshots/",
+                                includePathPattern: 'test-output/screenshots/**'
+                            )
+
+                            def reportUrl = "https://s3.console.aws.amazon.com/s3/buckets/${TEST_RESULTS_BUCKET}/${s3Path}"
+                            env.REPORT_URL = reportUrl
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Generate Report Dashboard') {
+            steps {
+                publishHTML([
+                    allowMissing: false,
+                    alwaysLinkToLastBuild: true,
+                    keepAll: true,
+                    reportDir: 'target/surefire-reports',
+                    reportFiles: 'index.html',
+                    reportName: 'Test Report'
+                ])
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+
+        }
+
+        failure {
+            emailext(
+                subject: "Build Failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """
+                    <h2>Build Failed</h2>
+                    <p><b>Job:</b> ${env.JOB_NAME}</p>
+                    <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
+                    <p><b>Test Report:</b> <a href="${env.REPORT_URL}">View on S3</a></p>
+                    <p>Check console output at <a href="${env.BUILD_URL}">Jenkins</a></p>
+                """,
+                to: 'aldi-qa-team@aldi.com',
+                mimeType: 'text/html',
+                attachLog: true
+            )
+        }
+    }
+}
