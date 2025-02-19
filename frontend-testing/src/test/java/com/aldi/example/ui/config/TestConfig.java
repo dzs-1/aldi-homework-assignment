@@ -1,4 +1,4 @@
-package com.aldi.example.config;
+package com.aldi.example.ui.config;
 
 import java.io.IOException;
 import java.util.Properties;

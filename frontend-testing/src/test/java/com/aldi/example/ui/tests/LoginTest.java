@@ -1,7 +1,7 @@
-package com.aldi.example.tests;
+package com.aldi.example.ui.tests;
 
-import com.aldi.example.config.TestConfig;
-import com.aldi.example.pages.LoginPage;
+import com.aldi.example.ui.config.TestConfig;
+import com.aldi.example.ui.pages.LoginPage;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;

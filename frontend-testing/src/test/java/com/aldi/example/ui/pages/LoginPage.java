@@ -1,4 +1,4 @@
-package com.aldi.example.pages;
+package com.aldi.example.ui.pages;
 
 import com.microsoft.playwright.Page;
 
