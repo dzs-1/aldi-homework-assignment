@@ -4,6 +4,8 @@ import org.junit.jupiter.api.*;
 import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import com.aldi.example.pages.TaskPage;
+import org.openqa.selenium.chrome.ChromeOptions;
+
 import java.util.logging.Logger;
 
 public class DeleteTaskTest {
@@ -14,7 +16,16 @@ public class DeleteTaskTest {
     @BeforeEach
     void setUp() {
         logger.info("Setting up the environment...");
-        driver = new ChromeDriver();
+        ChromeOptions options = new ChromeOptions();
+        options.addArguments(
+                "--disable-notifications",
+                "--start-maximized",
+                "--disable-infobars",
+                "--disable-gpu",
+                "--disable-extensions",
+                "--no-sandbox",
+                "--disable-popup-blocking");
+        driver = new ChromeDriver(options);
         driver.get("https://aldi-example.com");
         taskPage = new TaskPage(driver);
         logger.info("Navigated to the homepage.");
